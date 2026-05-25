@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/simonks2016/hensparkIO-payload/model"
@@ -40,7 +41,7 @@ type Envelope[T any] struct {
 
 type ContentTypeInterface interface {
 	model.MarketFeature | model.Predicts | model.OHLCV | model.Trade | model.OrderBook | model.Portfolio |
-		model.AccountStatus | model.AlphaLab | EventAck | HeartBeat | model.Feeds | model.OrderState | SysFeature
+	model.AccountStatus | model.AlphaLab | EventAck | HeartBeat | model.Feeds | model.OrderState | SysFeature | json.RawMessage
 }
 
 type EnvelopeOption[T ContentTypeInterface] func(envelope *Envelope[T])
@@ -59,9 +60,10 @@ func NewEnvelope[T ContentTypeInterface](Code int, opts ...EnvelopeOption[T]) *E
 	return env
 }
 
-func WithContent[T ContentTypeInterface](data ...T) EnvelopeOption[T] {
+func WithContent[T ContentTypeInterface](contentType ContentType, data ...T) EnvelopeOption[T] {
 	return func(envelope *Envelope[T]) {
 		envelope.Content = append(envelope.Content, data...)
+		envelope.ContentType = contentType
 	}
 }
 
