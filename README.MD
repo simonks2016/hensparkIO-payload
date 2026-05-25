@@ -34,7 +34,7 @@ import (
 如果作为外部依赖使用，需要先把仓库发布到可访问的 Git 地址，然后：
 
 ```bash
-go get <your-git-host>/hensparkIO-payload
+go get github.com/simonks2016/hensparkIO-payload
 ```
 
 ## 通用约定
