@@ -412,12 +412,12 @@ type Auth struct {
 账号密码示例：
 
 ```go
-account := "demo"
-password := "secret"
+account := utils.StringPtr("demo")
+password := utils.StringPtr("secret")
 
 auth := request.Auth{
-	Account:  &account,
-	Password: &password,
+	Account:  account,
+	Password: password,
 	VerifyBy: "password",
 }
 ```
@@ -425,12 +425,12 @@ auth := request.Auth{
 验证码示例：
 
 ```go
-phone := "+8613800000000"
-code := "123456"
+phone := utils.Int64Ptr("+8613800000000")
+code := utils.Int64Ptr("123456")
 
 auth := request.Auth{
-	MobilePhone: &phone,
-	VerifyCode:  &code,
+	MobilePhone: phone,
+	VerifyCode:  code,
 	VerifyBy:    "sms",
 }
 ```
@@ -838,13 +838,15 @@ type Trade struct {
 调用：
 
 ```go
-trade := model.Trade{
+package main
+
+trade = model.Trade{
 	Symbol:      "BTC-USD",
 	Px:          68400.12,
 	Qty:         0.5,
 	Side:        "buy",
 	EventTimeMs: time.Now().UnixMilli(),
-	Venue:       "Binance",
+	Venue:       strings.ToUpper("Binance"),
 }
 
 env := protocol.NewEnvelope[model.Trade](
@@ -1011,7 +1013,7 @@ type AccountStatus struct {
 status := model.AccountStatus{
 	Username: "demo",
 	UserId:   "u-001",
-	UserIcon: "https://example.com/avatar.png",
+	UserIcon: "https://cdn-img.henspark.io/avatar.png",
 }
 
 env := protocol.NewEnvelope[model.AccountStatus](
@@ -1267,8 +1269,8 @@ func main() {
 		"BTC-USD",
 		model.CombinedFeature,
 		model.WithMarketFeatureWindowMs(
-			now.Add(time.Hour).UnixMilli(),
 			now.UnixMilli(),
+			now.Add(time.Hour).UnixMilli(),
 		),
 		model.WithMarketFeatureMetric("VWAP", 68400.12),
 		model.WithMarketFeatureMetric("volatility", 0.12),
@@ -1304,11 +1306,10 @@ func main() {
 	p := model.NewPredicts(
 		model.WithSymbol("BTC-USD"),
 		model.WithPredictsWindowStartMs(
-			now.Add(time.Hour).UnixMilli(),
 			now.UnixMilli(),
+			now.Add(time.Hour).UnixMilli(),
 		),
-		model.WithTimeFrame("1H"),
-		model.WithPredictsMetrics(model.PredictsOHLCV{
+		model.WithPredictsMetrics[model.PredictsOHLCV](model.PredictsOHLCV{
 			OpenPrice:  68000,
 			HighPrice:  69000,
 			LowPrice:   67500,

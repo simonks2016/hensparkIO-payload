@@ -9,6 +9,7 @@ import (
 const (
 	OK200    int = 200
 	Error400 int = 400
+	Error403 int = 403
 )
 
 type ContentType int

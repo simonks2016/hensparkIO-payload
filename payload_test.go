@@ -12,7 +12,7 @@ import (
 func TestPayload(t *testing.T) {
 
 	protocol.NewEnvelope[model.MarketFeature](
-		200,
+		protocol.OK200,
 		protocol.WithMarketFeatures(
 			model.NewMarketFeature("BTC-USD", model.CombinedFeature,
 				model.WithMarketFeatureWindow(time.Now(), time.Now().Add(time.Hour)),
@@ -30,7 +30,7 @@ func TestPayload(t *testing.T) {
 	)
 
 	protocol.NewEnvelope[model.Predicts](
-		200,
+		protocol.OK200,
 		protocol.WithPredicts(
 			model.NewPredicts(
 				model.WithSymbol("BTC-USD"),
@@ -63,7 +63,7 @@ func TestPayload(t *testing.T) {
 			)))
 
 	protocol.NewEnvelope[protocol.EventAck](
-		403,
+		protocol.Error403,
 		protocol.WithEventAck(
 			protocol.NewEventAck(protocol.MethodSubscribe,
 				protocol.WithErrorAck(403, ""),
