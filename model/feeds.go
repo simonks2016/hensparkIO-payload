@@ -14,6 +14,7 @@ type Feeds struct {
 	Type        FeedType          `json:"type"`
 	Title       *string           `json:"title,omitempty"`
 	Text        string            `json:"text"`
+	Language    *string           `json:"language,omitempty"`
 	Source      string            `json:"source"`
 	EventTimeMs int64             `json:"event_time_ms"`
 	Priority    int               `json:"priority,omitempty"`

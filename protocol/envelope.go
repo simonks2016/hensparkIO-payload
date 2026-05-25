@@ -1,8 +1,9 @@
 package protocol
 
 import (
-	"hensparkIO-payload/model"
 	"strings"
+
+	"github.com/simonks2016/hensparkIO-payload/model"
 )
 
 const (

@@ -1,9 +1,10 @@
 package request
 
 import (
-	"github.com/google/uuid"
-	"hensparkIO-payload/protocol"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/simonks2016/hensparkIO-payload/protocol"
 )
 
 type SubscriptionRequest struct {
@@ -15,10 +16,11 @@ type SubscriptionRequest struct {
 }
 
 type ChannelSubscription struct {
-	Channel    protocol.Channel `json:"channel"`
-	Symbols    []string         `json:"symbols,omitempty"`
-	TimeFrames []string         `json:"time_frames,omitempty"`
-	Exchange   *string          `json:"exchange,omitempty"`
+	Channel     protocol.Channel  `json:"channel"`
+	Symbols     []string          `json:"symbols,omitempty"`
+	TimeFrames  []string          `json:"time_frames,omitempty"`
+	Exchange    *string           `json:"exchange,omitempty"`
+	Preferences map[string]string `json:"preferences,omitempty"`
 }
 
 type SubscriptionOption func(*SubscriptionRequest)
@@ -111,5 +113,15 @@ func WithTimeFrames(timeFrames ...string) ChannelOption {
 func WithExchange(exchange string) ChannelOption {
 	return func(sub *ChannelSubscription) {
 		sub.Exchange = &exchange
+	}
+}
+
+func WithPreferredLanguage(lang protocol.Lang) ChannelOption {
+
+	return func(sub *ChannelSubscription) {
+		if sub.Preferences == nil {
+			sub.Preferences = make(map[string]string)
+		}
+		sub.Preferences["lang"] = string(lang)
 	}
 }

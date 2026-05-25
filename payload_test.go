@@ -1,11 +1,12 @@
 package hensparkIO_payload
 
 import (
-	"hensparkIO-payload/model"
-	"hensparkIO-payload/protocol"
-	"hensparkIO-payload/request"
 	"testing"
 	"time"
+
+	"github.com/simonks2016/hensparkIO-payload/model"
+	"github.com/simonks2016/hensparkIO-payload/protocol"
+	"github.com/simonks2016/hensparkIO-payload/request"
 )
 
 func TestPayload(t *testing.T) {

@@ -1,9 +1,9 @@
 package model
 
 import (
-	"encoding/json"
-	"hensparkIO-payload/utils"
 	"time"
+
+	"github.com/simonks2016/hensparkIO-payload/utils"
 )
 
 type MarketFeature struct {
@@ -64,11 +64,6 @@ func WithMarketFeatureMetrics(
 			feature.Data[k] = v
 		}
 	}
-}
-
-func (m MarketFeature) String() string {
-	jso, _ := json.Marshal(m)
-	return string(jso)
 }
 
 func NewMarketFeature(symbol string, featureType FeatureType, options ...MarketFeatureOption) MarketFeature {

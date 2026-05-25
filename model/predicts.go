@@ -1,8 +1,9 @@
 package model
 
 import (
-	"hensparkIO-payload/utils"
 	"time"
+
+	"github.com/simonks2016/hensparkIO-payload/utils"
 )
 
 type Predicts struct {

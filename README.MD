@@ -5,7 +5,7 @@
 模块名：
 
 ```go
-import "hensparkIO-payload/..."
+import "github.com/simonks2016/hensparkIO-payload/..."
 ```
 
 当前主要 package：
@@ -17,17 +17,15 @@ import "hensparkIO-payload/..."
 | `model` | 业务数据模型：行情、预测、Feed、账户、组合、订单、AlphaLab |
 | `utils` | 时间窗口工具 |
 
-> 注意：当前代码里的 `model/order.go` 引用了 `hensparkIO-payload/response`，但仓库中还没有 `response` package，所以 `go test ./...` 会因为缺少该 package 失败。`OrderState.Account` 的类型依赖这个缺失包。
-
 ## 安装和使用
 
 在同一个 Go module 中直接导入：
 
 ```go
 import (
-	"hensparkIO-payload/model"
-	"hensparkIO-payload/protocol"
-	"hensparkIO-payload/request"
+	"github.com/simonks2016/hensparkIO-payload/model"
+	"github.com/simonks2016/hensparkIO-payload/protocol"
+	"github.com/simonks2016/hensparkIO-payload/request"
 )
 ```
 
@@ -51,6 +49,9 @@ go get github.com/simonks2016/hensparkIO-payload
 | `inference_time_ms` | 推理时间，Unix milliseconds |
 | `expires_at_ms` | 预测过期时间，Unix milliseconds |
 | `update_time_ms` | 更新时间，Unix milliseconds |
+| `update_interval` | 更新间隔，milliseconds |
+| `ts` | 心跳时间戳，Unix milliseconds |
+| `event_time` | 订单事件时间，Unix milliseconds。注意字段名没有 `_ms` 后缀 |
 
 ### TimeFrame 字符串
 
@@ -78,7 +79,22 @@ tf := utils.GenTimeFrame(5 * 60 * 1000)
 // tf == "5MIN"
 ```
 
-> 注意：`WithMarketFeatureWindow`、`WithMarketFeatureWindowMs`、`WithPredictsWindow`、`WithPredictsWindowStartMs` 当前使用 `start - end` 生成 timeframe。如果 `start < end`，自动生成的 `time_frame` 会是空字符串。`utils.GenTimeFrame` 会先匹配小时再匹配天，所以 24 小时会输出 `24H`，不是 `1D`。需要时可以用 `WithTimeFrame("1H")` 手动覆盖预测数据的 timeframe。
+> 注意：`WithMarketFeatureWindow`、`WithMarketFeatureWindowMs`、`WithPredictsWindow`、`WithPredictsWindowStartMs` 当前使用 `end - start` 生成 timeframe。如果 `end <= start`，自动生成的 `time_frame` 会是空字符串。`utils.GenTimeFrame` 会先匹配小时再匹配天，所以 24 小时会输出 `24H`，不是 `1D`。需要时可以用 `WithTimeFrame("1H")` 手动覆盖预测数据的 timeframe。
+
+### 时间单位检查
+
+当前代码里时间戳和时间间隔都按毫秒写入：
+
+| 位置 | 代码 | 单位 |
+| --- | --- | --- |
+| `request.WithUpdateInterval` | `duration.Milliseconds()` | 毫秒 |
+| `protocol.NewHeartBeat` | `time.Now().UnixMilli()` | 毫秒时间戳 |
+| `model.WithMarketFeatureWindow` | `start.UnixMilli()` / `end.UnixMilli()` | 毫秒时间戳 |
+| `model.WithPredictsWindow` | `start.UnixMilli()` / `end.UnixMilli()` | 毫秒时间戳 |
+| `model.WithInferenceTime` | `inferenceTime.UnixMilli()` / `expiresAt.UnixMilli()` | 毫秒时间戳 |
+| 示例里的事件时间 | `time.Now().UnixMilli()` | 毫秒时间戳 |
+
+未发现使用 `Unix()` 秒、`UnixMicro()` 微秒、`UnixNano()` 纳秒写出的时间戳。需要注意的是 `HeartBeat.Ts` 的 JSON 字段是 `ts`，`OrderState.EventTime` 的 JSON 字段是 `event_time`，字段名没有 `_ms` 后缀，但值按毫秒传。
 
 ## protocol package
 
@@ -103,6 +119,30 @@ tf := utils.GenTimeFrame(5 * 60 * 1000)
 | `protocol.ChannelAIFeed` | `ai_feed` | AI 信息流 |
 | `protocol.ChannelNews` | `news` | 新闻 |
 | `protocol.ChannelAlphaLab` | `alpha_lab` | AlphaLab 数据 |
+
+### Lang
+
+语言偏好常量，当前用于订阅频道的 `preferences.lang`：
+
+| 常量 | JSON 值 |
+| --- | --- |
+| `protocol.ZhCn` | `zh-cn` |
+| `protocol.ZhTw` | `zh-tw` |
+| `protocol.ZhHk` | `zh-hk` |
+| `protocol.EnUs` | `en-us` |
+| `protocol.EnGb` | `en-gb` |
+| `protocol.JaJp` | `ja-jp` |
+| `protocol.KoKr` | `ko-kr` |
+| `protocol.ThTh` | `th-th` |
+| `protocol.ViVn` | `vi-vn` |
+| `protocol.IdId` | `id-id` |
+| `protocol.FrFr` | `fr-fr` |
+| `protocol.DeDe` | `de-de` |
+| `protocol.EsEs` | `es-es` |
+| `protocol.PtBr` | `pt-br` |
+| `protocol.RuRu` | `ru-ru` |
+| `protocol.HiIn` | `hi-in` |
+| `protocol.ArSa` | `ar-sa` |
 
 ### Envelope
 
@@ -411,22 +451,23 @@ type SubscriptionRequest struct {
 
 字段说明：
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `method` | `protocol.Method` | 是 | `subscribe` 或 `unsubscribe` |
-| `channels` | `[]ChannelSubscription` | 是 | 频道订阅列表 |
-| `update_interval` | `*int64` | 否 | 更新间隔，当前 `WithUpdateInterval` 写入的是微秒值 |
-| `return_type` | `*string` | 否 | 返回类型，当前没有内置 option，需要手动赋值 |
+| 字段 | 类型 | 必填 | 说明                                        |
+| --- | --- | --- |-------------------------------------------|
+| `method` | `protocol.Method` | 是 | `subscribe` 或 `unsubscribe`               |
+| `channels` | `[]ChannelSubscription` | 是 | 频道订阅列表                                    |
+| `update_interval` | `*int64` | 否 | 更新间隔，当前 `WithUpdateInterval` 写入的是毫秒值      |
+| `return_type` | `*string` | 否 | 返回类型，当前没有内置 option，需要手动赋值                 |
 | `request_id` | `*string` | 否 | 请求 ID，`NewSubscriptionRequest` 会自动生成 UUID |
 
 `ChannelSubscription`：
 
 ```go
 type ChannelSubscription struct {
-	Channel    protocol.Channel `json:"channel"`
-	Symbols    []string         `json:"symbols,omitempty"`
-	TimeFrames []string         `json:"time_frames,omitempty"`
-	Exchange   *string          `json:"exchange,omitempty"`
+	Channel     protocol.Channel  `json:"channel"`
+	Symbols     []string          `json:"symbols,omitempty"`
+	TimeFrames  []string          `json:"time_frames,omitempty"`
+	Exchange    *string           `json:"exchange,omitempty"`
+	Preferences map[string]string `json:"preferences,omitempty"`
 }
 ```
 
@@ -438,6 +479,7 @@ type ChannelSubscription struct {
 | `symbols` | `[]string` | 否 | 交易对 |
 | `time_frames` | `[]string` | 否 | 时间窗口 |
 | `exchange` | `*string` | 否 | 交易所 |
+| `preferences` | `map[string]string` | 否 | 订阅偏好，例如语言偏好 `{"lang":"zh-cn"}` |
 
 创建订阅请求：
 
@@ -448,6 +490,7 @@ req := request.NewSubscriptionRequest(
 		request.WithSymbols("BTC-USD", "ETH-USD"),
 		request.WithTimeFrames("1S", "5S", "1MIN"),
 		request.WithExchange("Kraken"),
+		request.WithPreferredLanguage(protocol.ZhCn),
 	),
 	request.WithUpdateInterval(100*time.Millisecond),
 )
@@ -463,15 +506,18 @@ req := request.NewSubscriptionRequest(
       "channel": "tick",
       "symbols": ["BTC-USD", "ETH-USD"],
       "time_frames": ["1S", "5S", "1MIN"],
-      "exchange": "Kraken"
+      "exchange": "Kraken",
+      "preferences": {
+        "lang": "zh-cn"
+      }
     }
   ],
-  "update_interval": 100000,
+  "update_interval": 100,
   "request_id": "自动生成的 UUID"
 }
 ```
 
-> 注意：`WithUpdateInterval(100*time.Millisecond)` 当前使用 `duration.Microseconds()`，所以 JSON 里是 `100000`，单位是微秒，不是毫秒。
+> 注意：`WithUpdateInterval(100*time.Millisecond)` 当前使用 `duration.Milliseconds()`，所以 JSON 里是 `100`，单位是毫秒。
 
 取消订阅：
 
@@ -505,6 +551,31 @@ req := request.NewSubscriptionRequest(
 | `request.WithSymbols(symbols ...string)` | 交易对 | 设置 `symbols` |
 | `request.WithTimeFrames(timeFrames ...string)` | timeframe | 设置 `time_frames` |
 | `request.WithExchange(exchange string)` | 交易所 | 设置 `exchange` |
+| `request.WithPreferredLanguage(lang protocol.Lang)` | 语言枚举 | 设置 `preferences.lang` |
+
+订阅偏好示例：
+
+```go
+req := request.NewSubscriptionRequest(
+	protocol.MethodSubscribe,
+	request.WithNews(
+		request.WithPreferredLanguage(protocol.ZhCn),
+	),
+	request.WithAIFeeds(
+		request.WithPreferredLanguage(protocol.EnUs),
+	),
+)
+```
+
+输出中的 `preferences` 类似：
+
+```json
+{
+  "preferences": {
+    "lang": "zh-cn"
+  }
+}
+```
 
 多频道订阅：
 
@@ -519,6 +590,7 @@ req := request.NewSubscriptionRequest(
 	request.WithPredictions(
 		request.WithSymbols("BTC-USD"),
 		request.WithTimeFrames("1H"),
+		request.WithPreferredLanguage(protocol.EnUs),
 	),
 	request.WithNews(),
 )
@@ -876,6 +948,7 @@ type Feeds struct {
 	Type        FeedType          `json:"type"`
 	Title       *string           `json:"title,omitempty"`
 	Text        string            `json:"text"`
+	Language    *string           `json:"language,omitempty"`
 	Source      string            `json:"source"`
 	EventTimeMs int64             `json:"event_time_ms"`
 	Priority    int               `json:"priority,omitempty"`
@@ -897,12 +970,14 @@ type Feeds struct {
 
 ```go
 title := "BTC momentum changed"
+lang := string(protocol.EnUs)
 
 feed := model.Feeds{
 	Id:          "feed-001",
 	Type:        model.FeedTypeMarketSignal,
 	Title:       &title,
 	Text:        "BTC short-term momentum increased.",
+	Language:    &lang,
 	Source:      "alpha-engine",
 	EventTimeMs: time.Now().UnixMilli(),
 	Priority:    2,
@@ -1014,13 +1089,13 @@ env := protocol.NewEnvelope[model.Portfolio](
 
 ```go
 type OrderState struct {
-	OrderId     string            `json:"order_id"`
-	Status      string            `json:"status"`
-	FilledPrice float64           `json:"filled_price"`
-	FilledSize  float64           `json:"filled_size"`
-	Side        string            `json:"side"`
-	EventTime   int64             `json:"event_time"`
-	Account     *response.Account `json:"account"`
+	OrderId     string         `json:"order_id"`
+	Status      string         `json:"status"`
+	FilledPrice float64        `json:"filled_price"`
+	FilledSize  float64        `json:"filled_size"`
+	Side        string         `json:"side"`
+	EventTime   int64          `json:"event_time"`
+	Account     *AccountStatus `json:"account"`
 }
 ```
 
@@ -1033,8 +1108,8 @@ type OrderState struct {
 | `filled_price` | 已成交均价 |
 | `filled_size` | 已成交数量 |
 | `side` | 买卖方向，例如 `buy` / `sell` |
-| `event_time` | 事件时间 |
-| `account` | 账户信息，依赖缺失的 `response.Account` |
+| `event_time` | 事件时间，单位毫秒 |
+| `account` | 账户信息 |
 
 调用：
 
@@ -1046,6 +1121,10 @@ state := model.OrderState{
 	FilledSize:  0.1,
 	Side:        "buy",
 	EventTime:   time.Now().UnixMilli(),
+	Account: &model.AccountStatus{
+		Username: "demo",
+		UserId:   "u-001",
+	},
 }
 
 env := protocol.NewEnvelope[model.OrderState](
@@ -1053,8 +1132,6 @@ env := protocol.NewEnvelope[model.OrderState](
 	protocol.WithOrderState(state),
 )
 ```
-
-> 注意：`model.OrderState` 的 `Account` 字段依赖当前仓库缺失的 `hensparkIO-payload/response` package。补齐该 package 前，包含 `model/order.go` 的项目编译会失败。
 
 ### AlphaLab
 
@@ -1149,8 +1226,8 @@ import (
 	"fmt"
 	"time"
 
-	"hensparkIO-payload/protocol"
-	"hensparkIO-payload/request"
+	"github.com/simonks2016/hensparkIO-payload/protocol"
+	"github.com/simonks2016/hensparkIO-payload/request"
 )
 
 func main() {
@@ -1179,8 +1256,8 @@ import (
 	"fmt"
 	"time"
 
-	"hensparkIO-payload/model"
-	"hensparkIO-payload/protocol"
+	"github.com/simonks2016/hensparkIO-payload/model"
+	"github.com/simonks2016/hensparkIO-payload/protocol"
 )
 
 func main() {
@@ -1217,8 +1294,8 @@ import (
 	"fmt"
 	"time"
 
-	"hensparkIO-payload/model"
-	"hensparkIO-payload/protocol"
+	"github.com/simonks2016/hensparkIO-payload/model"
+	"github.com/simonks2016/hensparkIO-payload/protocol"
 )
 
 func main() {
@@ -1282,7 +1359,8 @@ env := protocol.NewEnvelope[protocol.HeartBeat](
 
 ## 当前已知注意事项
 
-1. `hensparkIO-payload/response` package 缺失，导致 `model.OrderState` 相关代码无法完整编译。
-2. `WithUpdateInterval` 的注释写“更新频率”，传入 `time.Duration`，但实际写入 `duration.Microseconds()`，字段名又叫 `update_interval`。调用方需要统一单位约定。
-3. timeframe 自动生成当前使用 `start - end`。如果业务语义是“开始时间早于结束时间”，自动生成会得到空字符串，建议调用时手动 `WithTimeFrame`，或在代码里改为 `end - start`。
-4. `model.Feeds`、`model.OrderState`、`protocol.SysFeature` 已经加入 `protocol.ContentTypeInterface`，可以分别通过 `WithFeeds`、`WithOrderState`、`WithSystemMetrics` 包装进 `Envelope`。
+1. 当前未发现代码把时间戳写成秒、微秒或纳秒；`WithUpdateInterval`、窗口时间、推理时间、心跳时间都使用毫秒。
+2. `HeartBeat.Ts` 的 JSON 字段是 `ts`，`OrderState.EventTime` 的 JSON 字段是 `event_time`，字段名没有 `_ms` 后缀，但值应按毫秒传。
+3. `SysFeature` 的 `overall_latency`、`collection_latency`、`computation_latency` 是延迟指标，字段名没有标注单位；建议调用方也按毫秒约定传递。
+4. `utils.GenTimeFrame` 会先匹配小时再匹配天，所以 24 小时当前输出 `24H`，不是 `1D`。
+5. `model.Feeds`、`model.OrderState`、`protocol.SysFeature` 已经加入 `protocol.ContentTypeInterface`，可以分别通过 `WithFeeds`、`WithOrderState`、`WithSystemMetrics` 包装进 `Envelope`。
