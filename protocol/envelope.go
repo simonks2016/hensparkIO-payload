@@ -41,7 +41,7 @@ type Envelope[T any] struct {
 
 type ContentTypeInterface interface {
 	model.MarketFeature | model.Predicts | model.OHLCV | model.Trade | model.OrderBook | model.Portfolio |
-	model.AccountStatus | model.AlphaLab | EventAck | HeartBeat | model.Feeds | model.OrderState | SysFeature | json.RawMessage
+		model.AccountStatus | model.AlphaLab | EventAck | HeartBeat | model.Feeds | model.OrderState | SysFeature | json.RawMessage
 }
 
 type EnvelopeOption[T ContentTypeInterface] func(envelope *Envelope[T])

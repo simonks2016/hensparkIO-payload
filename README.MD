@@ -15,7 +15,7 @@ import "github.com/simonks2016/hensparkIO-payload/..."
 | `request` | 认证请求、订阅/取消订阅请求 |
 | `protocol` | 通用响应信封、频道、方法、ACK、心跳 |
 | `model` | 业务数据模型：行情、预测、Feed、账户、组合、订单、AlphaLab |
-| `utils` | 时间窗口工具 |
+| `utils` | 时间窗口工具、基础类型指针辅助函数 |
 
 ## 安装和使用
 
@@ -26,6 +26,7 @@ import (
 	"github.com/simonks2016/hensparkIO-payload/model"
 	"github.com/simonks2016/hensparkIO-payload/protocol"
 	"github.com/simonks2016/hensparkIO-payload/request"
+	"github.com/simonks2016/hensparkIO-payload/utils"
 )
 ```
 
@@ -174,6 +175,7 @@ type Envelope[T any] struct {
 | --- | --- |
 | `protocol.OK200` | `200` |
 | `protocol.Error400` | `400` |
+| `protocol.Error403` | `403` |
 
 `ContentType` 枚举值：
 
@@ -193,6 +195,25 @@ type Envelope[T any] struct {
 | `protocol.OrderStateContentType` | `11` | `model.OrderState` |
 | `protocol.SystemFeatureContentType` | `12` | `protocol.SysFeature` |
 
+`NewEnvelope[T]` 当前允许的 `T` 包括：
+
+```go
+model.MarketFeature
+model.Predicts
+model.OHLCV
+model.Trade
+model.OrderBook
+model.Portfolio
+model.AccountStatus
+model.AlphaLab
+protocol.EventAck
+protocol.HeartBeat
+model.Feeds
+model.OrderState
+protocol.SysFeature
+json.RawMessage
+```
+
 创建响应：
 
 ```go
@@ -207,7 +228,7 @@ env := protocol.NewEnvelope[model.MarketFeature](
 
 | 函数 | 参数 | 说明 |
 | --- | --- | --- |
-| `protocol.WithContent[T](data ...T)` | 任意允许的内容类型 | 只追加数据，不设置 `content_type` |
+| `protocol.WithContent[T](contentType protocol.ContentType, data ...T)` | 内容类型、任意允许的内容数据 | 追加数据并显式设置 `content_type` |
 | `protocol.WithMarketFeatures(data ...model.MarketFeature)` | 市场特征 | 追加数据并设置 `content_type=0` |
 | `protocol.WithPredicts(data ...model.Predicts)` | 预测结果 | 追加数据并设置 `content_type=1` |
 | `protocol.WithOHLCV(data ...model.OHLCV)` | K 线数据 | 追加数据并设置 `content_type=2` |
@@ -223,6 +244,29 @@ env := protocol.NewEnvelope[model.MarketFeature](
 | `protocol.WithSystemMetrics(f ...protocol.SysFeature)` | 系统指标 | 追加数据并设置 `content_type=12` |
 | `protocol.WithMessage[T](key, value string)` | 消息键值 | 添加 `message` |
 | `protocol.WithErrorMessage[T](errorCode int, errorMessage ...string)` | 错误码、错误消息 | 设置 `code=400`、`error_code`、`message.error_message` |
+
+通用内容包装示例：
+
+```go
+env := protocol.NewEnvelope[model.Trade](
+	protocol.OK200,
+	protocol.WithContent(
+		protocol.TradesContentType,
+		model.Trade{Symbol: "BTC-USD", Px: 68400.12},
+	),
+)
+```
+
+原始 JSON 内容示例：
+
+```go
+raw := json.RawMessage(`{"symbol":"BTC-USD","score":0.92}`)
+
+env := protocol.NewEnvelope[json.RawMessage](
+	protocol.OK200,
+	protocol.WithContent(protocol.PredictsContentType, raw),
+)
+```
 
 错误响应示例：
 
@@ -412,12 +456,9 @@ type Auth struct {
 账号密码示例：
 
 ```go
-account := utils.StringPtr("demo")
-password := utils.StringPtr("secret")
-
 auth := request.Auth{
-	Account:  account,
-	Password: password,
+	Account:  utils.StrPtr("demo"),
+	Password: utils.StrPtr("secret"),
 	VerifyBy: "password",
 }
 ```
@@ -425,12 +466,9 @@ auth := request.Auth{
 验证码示例：
 
 ```go
-phone := utils.Int64Ptr("+8613800000000")
-code := utils.Int64Ptr("123456")
-
 auth := request.Auth{
-	MobilePhone: phone,
-	VerifyCode:  code,
+	MobilePhone: utils.StrPtr("+8613800000000"),
+	VerifyCode:  utils.StrPtr("123456"),
 	VerifyBy:    "sms",
 }
 ```
@@ -1216,6 +1254,48 @@ env := protocol.NewEnvelope[model.AlphaLab](
 )
 ```
 
+## utils package
+
+### GenTimeFrame
+
+`utils.GenTimeFrame(ms int64)` 根据毫秒差生成 timeframe 字符串。前面“TimeFrame 字符串”已经列出常见输入输出。
+
+```go
+tf := utils.GenTimeFrame(60 * 1000)
+// tf == "1MIN"
+```
+
+### 指针辅助函数
+
+`utils/ptr.go` 提供了一组把基础类型转成指针的辅助函数，适合给 `omitempty` 的指针字段赋值。
+
+| 函数 | 返回值 |
+| --- | --- |
+| `utils.Ptr[T comparable](data T)` | `*T` |
+| `utils.StrPtr(data string)` | `*string` |
+| `utils.IntPtr(data int)` | `*int` |
+| `utils.Int8Ptr(data int8)` | `*int8` |
+| `utils.Int16Ptr(data int16)` | `*int16` |
+| `utils.Int32Ptr(data int32)` | `*int32` |
+| `utils.Int64Ptr(data int64)` | `*int64` |
+| `utils.BoolPtr(data bool)` | `*bool` |
+| `utils.Float32Ptr(data float32)` | `*float32` |
+| `utils.Float64Ptr(data float64)` | `*float64` |
+
+调用：
+
+```go
+auth := request.Auth{
+	Account:  utils.StrPtr("demo"),
+	Password: utils.StrPtr("secret"),
+	VerifyBy: "password",
+}
+
+portfolio := model.Portfolio{
+	RealizedPnl: utils.Float64Ptr(123.45),
+}
+```
+
 ## 完整示例
 
 ### 订阅 tick 数据
@@ -1364,4 +1444,4 @@ env := protocol.NewEnvelope[protocol.HeartBeat](
 2. `HeartBeat.Ts` 的 JSON 字段是 `ts`，`OrderState.EventTime` 的 JSON 字段是 `event_time`，字段名没有 `_ms` 后缀，但值应按毫秒传。
 3. `SysFeature` 的 `overall_latency`、`collection_latency`、`computation_latency` 是延迟指标，字段名没有标注单位；建议调用方也按毫秒约定传递。
 4. `utils.GenTimeFrame` 会先匹配小时再匹配天，所以 24 小时当前输出 `24H`，不是 `1D`。
-5. `model.Feeds`、`model.OrderState`、`protocol.SysFeature` 已经加入 `protocol.ContentTypeInterface`，可以分别通过 `WithFeeds`、`WithOrderState`、`WithSystemMetrics` 包装进 `Envelope`。
+5. `model.Feeds`、`model.OrderState`、`protocol.SysFeature`、`json.RawMessage` 已经加入 `protocol.ContentTypeInterface`；前三者可以分别通过 `WithFeeds`、`WithOrderState`、`WithSystemMetrics` 包装进 `Envelope`，通用或原始 JSON 内容可以用 `WithContent(contentType, data...)`。
