@@ -56,13 +56,26 @@ func WithUpdateInterval(duration time.Duration) SubscriptionOption {
 // WithChannel 设置订阅频道
 func WithChannel(channel protocol.Channel, opts ...ChannelOption) SubscriptionOption {
 	return func(req *SubscriptionRequest) {
-		sub := ChannelSubscription{
-			Channel: channel,
-		}
-		for _, opt := range opts {
-			opt(&sub)
-		}
+		// 定义一个订阅频道参数
+		sub := NewChannelSubscription(channel, opts...)
+		// 插入
 		req.Channels = append(req.Channels, sub)
+	}
+}
+func NewChannelSubscription(channel protocol.Channel, opts ...ChannelOption) ChannelSubscription {
+	sub := ChannelSubscription{
+		Channel: channel,
+	}
+	for _, opt := range opts {
+		opt(&sub)
+	}
+	return sub
+}
+
+// WithChannels 批量订阅频道
+func WithChannels(requests ...ChannelSubscription) SubscriptionOption {
+	return func(req *SubscriptionRequest) {
+		req.Channels = append(req.Channels, requests...)
 	}
 }
 
@@ -78,7 +91,26 @@ func WithPredictions(opts ...ChannelOption) SubscriptionOption {
 
 // WithTicks 订阅Tick数据
 func WithTicks(opts ...ChannelOption) SubscriptionOption {
-	return WithChannel(protocol.ChannelTick, opts...)
+	return WithChannels(
+		NewChannelSubscription(protocol.ChannelOHLCV, opts...),
+		NewChannelSubscription(protocol.ChannelTrades, opts...),
+		NewChannelSubscription(protocol.ChannelOrderBook, opts...),
+	)
+}
+
+// WithTrades 订阅逐笔交易数据
+func WithTrades(opts ...ChannelOption) SubscriptionOption {
+	return WithChannel(protocol.ChannelTrades, opts...)
+}
+
+// WithOrderBook 订阅盘口数据
+func WithOrderBook(opts ...ChannelOption) SubscriptionOption {
+	return WithChannel(protocol.ChannelOrderBook, opts...)
+}
+
+// WithOHLCV 订阅K线数据
+func WithOHLCV(opts ...ChannelOption) SubscriptionOption {
+	return WithChannel(protocol.ChannelOHLCV, opts...)
 }
 
 // WithAIFeeds 订阅信息流
@@ -94,6 +126,11 @@ func WithNews(opts ...ChannelOption) SubscriptionOption {
 // WithAlphaLab 订阅alpha实验室数据
 func WithAlphaLab(opts ...ChannelOption) SubscriptionOption {
 	return WithChannel(protocol.ChannelAlphaLab, opts...)
+}
+
+// WithSystemMetrics 订阅系统参数
+func WithSystemMetrics() SubscriptionOption {
+	return WithChannel(protocol.ChannelSystemMetrics)
 }
 
 type ChannelOption func(*ChannelSubscription)
