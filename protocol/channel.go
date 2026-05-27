@@ -13,3 +13,7 @@ const (
 	ChannelOrderBook     Channel = "order_book"
 	ChannelSystemMetrics Channel = "system_metrics"
 )
+
+func (channel Channel) String() string {
+	return string(channel)
+}
